@@ -1,0 +1,11 @@
+Loaded 23448 queries from corpus.txt
+[2026-08-12 23:12:54:086846][149135104][DOCA][INF][doca_log.cpp:633] DOCA version 3.2.1025
+[2026-08-12 23:12:54:094218][149135104][DOCA][WRN][linux_device_adapter.cpp:1815] Host PF is disabled
+Running single-request-per-launch pass (23448 launches)...
+Running batched pass (184 batches of 128)...
+routeNIC Experiment 1 bench, single-request-per-launch (real DPA hardware, 23448 samples, corpus=corpus.txt):
+  mean=1323051 ns  p50=1260743 ns  p95=1673442 ns  p99=2250901 ns
+  wall clock=31.027s  throughput=755.7 launches/sec
+routeNIC Experiment 1 bench, batched (batch_size=128, real DPA hardware, 184 batches, 23448 requests, corpus=corpus.txt):
+  mean=5455018 ns/launch  (42617 ns/request amortized)  p50=1971145 ns/launch  p99=100068761 ns/launch
+  wall clock=1.005s  throughput=23335.6 requests/sec

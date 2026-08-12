@@ -2,6 +2,7 @@
 build/
 *.a
 *.o
+control-plane/software_baseline_bench/matchrate/matchrate
 
 # Python
 __pycache__/
@@ -10,3 +11,13 @@ __pycache__/
 # accuracy_study/results.json IS committed on purpose — it's the actual
 # measured output backing docs/experiments/01-*.md, not a throwaway build
 # artifact. Do not add a blanket results.json ignore rule here.
+
+# Extracted LMSYS Chatbot Arena prompts + huggingface_hub's download cache
+# (gated dataset — regenerate locally via data/download_chatbot_arena.py
+# with your own accepted HF access rather than committing a redistributed
+# copy here). The download/extraction script itself IS committed; only its
+# output is excluded.
+control-plane/software_baseline_bench/data/*.txt
+control-plane/software_baseline_bench/data/*.json
+control-plane/software_baseline_bench/data/data/
+control-plane/software_baseline_bench/data/.cache/

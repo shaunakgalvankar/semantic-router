@@ -21,11 +21,41 @@
 package softwarebaselinebench
 
 import (
+	"bufio"
+	"os"
 	"testing"
 
 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/classification"
 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/config"
 )
+
+// loadLargeCorpus reads the real, large-scale query corpus produced by
+// data/download_chatbot_arena.py — one query per line, already cleaned
+// (English, non-flagged, deduped, newlines stripped). Not committed to the
+// repo (see data/download_chatbot_arena.py's header for why); tests that
+// need it skip cleanly if it hasn't been generated locally.
+func loadLargeCorpus(tb testing.TB) []string {
+	tb.Helper()
+	f, err := os.Open("data/chatbot_arena_queries.txt")
+	if err != nil {
+		tb.Skipf("large corpus not found (run data/download_chatbot_arena.py first): %v", err)
+	}
+	defer f.Close()
+
+	var queries []string
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line != "" {
+			queries = append(queries, line)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		tb.Fatalf("failed reading large corpus: %v", err)
+	}
+	return queries
+}
 
 func realKeywordRules() []config.KeywordRule {
 	return []config.KeywordRule{
@@ -121,6 +151,28 @@ func BenchmarkRealKeywordClassify(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _, _ = kc.Classify(realQueries[i%len(realQueries)])
+	}
+}
+
+// BenchmarkRealKeywordClassifyLargeCorpus is the large-scale, real-world
+// counterpart to BenchmarkRealKeywordClassify above: 23,448 real, unique,
+// English, non-flagged first-turn user prompts from the LMSYS Chatbot Arena
+// Conversations dataset (Zheng et al., NeurIPS 2023 —
+// https://huggingface.co/datasets/lmsys/chatbot_arena_conversations),
+// instead of 34 hand-curated probe queries. This is the number that matters
+// for a "does this generalize" argument: real user traffic to real chatbots,
+// not queries designed to exercise a specific engine's behavior.
+func BenchmarkRealKeywordClassifyLargeCorpus(b *testing.B) {
+	queries := loadLargeCorpus(b)
+	kc, err := classification.NewKeywordClassifier(realKeywordRules())
+	if err != nil {
+		b.Fatalf("NewKeywordClassifier failed: %v", err)
+	}
+	defer kc.Free()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, _ = kc.Classify(queries[i%len(queries)])
 	}
 }
 

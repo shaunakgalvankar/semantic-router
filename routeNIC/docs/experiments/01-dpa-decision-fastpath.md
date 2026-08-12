@@ -78,13 +78,14 @@ two genuine defects:
 ## Real throughput benchmark vs. the real software baseline
 
 `host/fastpath_bench_main.c` — a timed loop against the exact same 4 real
-`config/config.yaml` rules and the exact same 34-query corpus
-`control-plane/software_baseline_bench` benchmarks on the router's actual
-`KeywordClassifier.Classify()`, so the two sides are a fair comparison, not
-two different workloads. See `bench_real_run_output.txt` in this directory
-for raw output and `routeNIC/docs/BENCHMARK_COMPARISON.md` for the full
-side-by-side writeup. Two real optimizations, found by profiling a
-naive first version against real hardware rather than assumed in advance:
+`config/config.yaml` rules `control-plane/software_baseline_bench` benchmarks
+on the router's actual `KeywordClassifier.Classify()`, now driven by either
+corpus: the real 23,448-query LMSYS Chatbot Arena corpus (`bench_large_corpus_output.txt`,
+the primary result — see `routeNIC/docs/BENCHMARK_COMPARISON.md`) or the
+original 34-query hand-curated set (`bench_real_run_output.txt`). Same
+binary, `<corpus-file> [batch_size] [max_queries]` args — see the file's own
+header. Two real optimizations, found by profiling a naive first version
+against real hardware rather than assumed in advance:
 
 1. **The single biggest lever: reuse the completion sync event.** The first
    version of `routenic_fastpath_launch()` created a fresh
@@ -109,12 +110,20 @@ naive first version against real hardware rather than assumed in advance:
    at the batched median, while dominating its expensive fuzzy-matching
    tail (up to 225µs) by 1–2 orders of magnitude.
 
-Honest gap in this result: batched mean (467–637µs/launch) sits well above
-batched median (~202µs/launch) across repeated runs — a real, reproducible
-right skew (occasional slow launches), not a one-off fluke, but not yet
-root-caused. Worth investigating with per-launch tracing before citing the
-mean figure as a stable SLA number; the median and throughput figures are
-more robust.
+Honest gap in this result: batched mean (467–637µs/launch on the small
+corpus) sits well above batched median (~202µs/launch) across repeated
+runs — a real, reproducible right skew, not a one-off fluke, but not yet
+root-caused. At the 184-batch scale of the large-corpus run this widened
+further (p99 = 100.9ms/launch, two orders of magnitude above the mean).
+Worth investigating with per-launch tracing before citing the mean figure
+as a stable SLA number; median and wall-clock throughput are more robust.
+
+**Real hardware limit found while scaling up:** batch sizes above 128 fail
+outright with `Exceeded valid max number of threads per kernel` (probed
+128/192/256/512/1024, then binary-searched between 128 and 192 to confirm
+128 is the exact ceiling). This BlueField-3's DPA cannot launch more than
+128 threads in a single kernel invocation — the large-corpus benchmark
+chunks its 23,448 queries into 184 launches of 128 for exactly this reason.
 
 ## What's not implemented yet (needs more BF3 time)
 
@@ -131,10 +140,11 @@ more robust.
   `control-plane/accuracy_study/workload.py` rather than generated from a
   shared schema — fine for a first correctness pass, a real gap for
   anything beyond it (see the launcher's own comment).
-- The batched-launch mean/median gap above isn't root-caused yet.
-- Batch size is currently fixed at the corpus size (34); no data yet on how
-  amortized cost scales with batch size, or what the optimal batch size is
-  against real DPA thread/EU limits.
+- The batched-launch mean/median gap (and its large-corpus p99 tail) above
+  isn't root-caused yet.
+- Batch size is capped at the confirmed real hardware limit (128 threads),
+  but nothing here explores *below* that — whether 128 is actually optimal
+  vs. some smaller size with a better tail-latency profile is unmeasured.
 
 ## Metrics this experiment feeds
 

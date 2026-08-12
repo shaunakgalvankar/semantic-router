@@ -7,6 +7,17 @@ dependencies outside the standard library.
 python3 run_study.py
 ```
 
+**For the large-scale version of this study** (23,448 real Chatbot Arena
+queries instead of 34 hand-curated ones, real software classifier output as
+ground truth instead of a Python reimplementation), see
+`large_corpus_accuracy.py` and `routeNIC/docs/BENCHMARK_COMPARISON.md`.
+Headline: 87.5% raw agreement, but only 38.7% recall — real software
+bm25/ngram matches turn out to often be loose statistical similarity, not
+literal substring presence, which the DPA's exact-substring approach can't
+replicate by construction. The numbers below are the original, smaller,
+mechanism-probing study; they're still useful for understanding *why*, just
+not for "does this generalize."
+
 ## What this measures
 
 The router's real keyword-signal engines (`bm25`, `ngram`, per-word
