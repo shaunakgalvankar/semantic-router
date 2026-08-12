@@ -12,22 +12,63 @@ kernel launch at startup? This is the mechanism idea #4 from the original
 brainstorm, and it's real, existing NVIDIA technology (DOCA GPUNetIO /
 GPUDirect Async), not something invented for this project.
 
-## What's implemented
+## What's implemented, and what's actually been run
 
-- `device/gpunetio_classifier_kernel.cu` — the persistent kernel.
-  **Compiles clean against the real DOCA GPUNetIO headers on this host at
-  `-arch=sm_121` (GB10's actual compute capability)**, verified with
-  `nvcc -c ... -gencode arch=compute_121,code=sm_121`. Structure follows
-  NVIDIA's own installed `gpunetio_simple_receive` sample exactly (same
-  `doca_gpu_dev_eth_rxq_recv` call, same `DOCA_GPUNETIO_VOLATILE` exit-flag
-  loop) — that sample stops at "packet received"; this one batches arrivals
-  into the SPSC ring in `gpunetio_classifier_common.h` and calls a
+- `device/gpunetio_classifier_kernel.cu` — the persistent kernel. Structure
+  follows NVIDIA's own installed `gpunetio_simple_receive` sample exactly
+  (same `doca_gpu_dev_eth_rxq_recv` call, same `DOCA_GPUNETIO_VOLATILE`
+  exit-flag loop) — that sample stops at "packet received"; this one batches
+  arrivals into the SPSC ring in `gpunetio_classifier_common.h` and calls a
   `classify_batch()` hook entirely inside the kernel.
-- `host/gpunetio_classifier_launcher.c` — device/mmap/rxq bootstrap,
-  syntax-verified against the real headers on this host. Allocates the
-  request ring as GPU memory registered for GPUDirect RDMA
-  (`DOCA_ACCESS_FLAG_RDMA_WRITE`), so a peer can write directly into
-  GPU-visible unified memory.
+- `host/gpunetio_classifier_launcher.c` + `gpunetio_classifier_main.c` — a
+  bounded (12s, watchdog-enforced) bring-up test, **actually built and run
+  against real GB10 + ConnectX-7 hardware**, not just compiled. Getting a
+  real run — not `nvcc -c`, which never device-links and so never catches
+  most of what's below — required fixing three genuine defects:
+  1. **`ddev` was never opened.** The original code declared
+     `struct doca_dev *ddev = NULL;` and passed it straight to
+     `doca_eth_rxq_create()` and friends — it stayed NULL the whole run.
+     Fixed by adding `routenic_open_nic_device()`
+     (`open_doca_device_with_pci`, the same helper every DOCA sample on this
+     host uses).
+  2. **No DOCA Flow port/pipe setup existed at all.** Without it, nothing
+     ever steers an arriving packet into this rxq — the kernel would poll
+     forever and legitimately never see a packet, which would have looked
+     identical to "the kernel doesn't work" without this being the real
+     cause. Fixed by porting `gpunetio_simple_receive_sample.c`'s
+     `init_doca_flow`/`start_doca_flow`/`create_udp_pipe`/`create_root_pipe`
+     sequence (UDP-matching root + rxq pipe) into the launcher, plus the
+     packet-buffer `doca_mmap`/dmabuf setup in `create_rxq()` that the
+     original version of this file also omitted entirely.
+  3. **The kernel could not link.** `__shared__ struct routenic_request_slot
+     batch[ROUTENIC_RING_CAPACITY]` sized a per-iteration batch buffer to
+     the *entire ring's capacity* (4096 × ~536 bytes ≈ 2.1MB) against this
+     GPU's 48KB per-block shared-memory limit. `nvlink` refused to link the
+     kernel outright — a check `nvcc -c` alone never runs. Fixed by
+     introducing `ROUTENIC_MAX_BATCH_PER_ITER` (64, a real per-launch cap
+     both `batch[]` and `out_attr[]` are now sized to, with `max_batch_size`
+     clamped to it defensively inside the kernel).
+- All three fixes verified: the kernel now compiles, device-links, and the
+  full executable builds and runs. **What it hits now is a real,
+  host-level blocker, isolated with a clean control test**: it fails at
+  GPUDirect RDMA memory registration (`doca_mmap_start` →
+  `DOCA_ERROR_DRIVER`, `errno=14` at the `devx` layer) — and **NVIDIA's own
+  unmodified `gpunetio_simple_receive` sample, built fresh via its real
+  `meson`/`ninja` project and pointed at the exact same GPU/NIC PCI
+  addresses, fails with the byte-for-byte identical error.** That rules out
+  application code as the cause. The kernel `nvidia-peermem.ko` exists on
+  this system but is not currently loaded (`lsmod` confirms); loading it
+  (`sudo modprobe nvidia-peermem`) is the next concrete thing to try, but
+  is a system-level kernel module change on shared lab hardware, not
+  something to do without asking first. Raw output from both runs (this
+  experiment's own test and the control test):
+  `real_run_output.txt` in this experiment's directory.
+
+Build and run it yourself with `./build_test.sh` then
+`sudo build/routenic_gpunetio_test <gpu-pci-addr> <nic-pci-addr>` (PCI
+addresses via `nvidia-smi -q | grep Bus.Id` and `lspci -d 15b3:`). The run is
+bounded to 12 seconds by a watchdog thread regardless of outcome — see
+`routenic_watchdog_thread()` in the launcher.
 
 ## The one deliberate scoping decision here
 

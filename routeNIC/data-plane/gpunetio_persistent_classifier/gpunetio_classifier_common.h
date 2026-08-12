@@ -34,6 +34,16 @@ extern "C" {
 #define ROUTENIC_MAX_RX_NUM_PKTS 2048
 #define ROUTENIC_MAX_RX_TIMEOUT_NS 500000U /* 500us, matches the DOCA sample default */
 
+/* Hard cap on how many packets persistent_classify() batches per recv()
+ * call — bounds the kernel's __shared__ memory usage (batch[] and out_attr[]
+ * in gpunetio_classifier_kernel.cu are both sized to this, not to
+ * ROUTENIC_MAX_RX_NUM_PKTS or ROUTENIC_RING_CAPACITY, which real device
+ * linking (not just compiling) proved is far too large — 48KB/block on this
+ * GPU vs. ~2.1MB the original sizing would have needed). Callers must not
+ * set routenic_classifier_cfg.max_batch_size above this; the kernel clamps
+ * defensively either way. */
+#define ROUTENIC_MAX_BATCH_PER_ITER 64U
+
 /* One classifier request slot. `text` is fixed-size and truncated on the
  * host/DPU side before RDMA write — a real deployment would carry a length
  * prefix and a variable-length region; fixed-size keeps the first working
@@ -72,6 +82,12 @@ struct routenic_classifier_cfg {
 	int cuda_id;
 	enum doca_gpu_dev_eth_exec_scope exec_scope;
 	uint32_t max_batch_size;
+	/* 0 = run until some other process signals gpu_exit_condition (not
+	 * wired up anywhere yet — see the experiment doc). Nonzero: a
+	 * watchdog thread forces the persistent kernel to exit after this
+	 * many seconds regardless of whether any packets arrived, so a bring-up
+	 * test run is guaranteed to terminate rather than spin forever. */
+	uint32_t bounded_run_seconds;
 };
 
 struct routenic_rxq_queue {

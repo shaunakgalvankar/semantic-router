@@ -96,9 +96,22 @@ __global__ void persistent_classify(struct doca_gpu_eth_rxq *rxq,
 	doca_error_t ret;
 	__shared__ uint64_t out_first_pkt_idx;
 	__shared__ uint32_t out_pkt_num;
-	__shared__ struct doca_gpu_dev_eth_rxq_attr out_attr[ROUTENIC_MAX_RX_NUM_PKTS];
-	__shared__ struct routenic_request_slot batch[ROUTENIC_RING_CAPACITY];
+	/* Sized to ROUTENIC_MAX_BATCH_PER_ITER (a small, fixed per-launch cap),
+	 * NOT to ROUTENIC_MAX_RX_NUM_PKTS/ROUTENIC_RING_CAPACITY as originally
+	 * written. `batch` at ROUTENIC_RING_CAPACITY (4096) entries alone was
+	 * ~2.1MB of static shared memory against this GPU's 48KB per-block
+	 * limit — nvlink correctly refused to link the kernel at all
+	 * ("uses too much shared data"). That's a link-time-only check:
+	 * `nvcc -c` compiling this file cleanly never caught it, only actually
+	 * trying to device-link the kernel did. `max_batch_size` is clamped to
+	 * this same cap below so a caller can never request more entries than
+	 * this buffer holds. */
+	__shared__ struct doca_gpu_dev_eth_rxq_attr out_attr[ROUTENIC_MAX_BATCH_PER_ITER];
+	__shared__ struct routenic_request_slot batch[ROUTENIC_MAX_BATCH_PER_ITER];
 	uint64_t tot_classified_ = 0;
+
+	if (max_batch_size > ROUTENIC_MAX_BATCH_PER_ITER)
+		max_batch_size = ROUTENIC_MAX_BATCH_PER_ITER;
 
 	while (DOCA_GPUNETIO_VOLATILE(*exit_cond) == 0) {
 		if (threadIdx.x == 0) {

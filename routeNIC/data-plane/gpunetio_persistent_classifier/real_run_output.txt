@@ -1,0 +1,39 @@
+[2026-08-12 19:42:08:670860][111675584][DOCA][INF][CORE][doca_log.cpp:900] DOCA version 3.3.0109
+[2026-08-12 19:42:09:090683][111675584][DOCA][WRN][FLOW][engine_model.c:88] adapting queue depth to 128.
+[2026-08-12 19:42:09:202622][111675584][DOCA][WRN][FLOW][hws_port.c:906] ARGUMENT_256B resource doesn't exist, skip creating NAT64 actions
+[2026-08-12 19:42:09:211001][111675584][DOCA][ERR][CORE][linux_devx_adapter.cpp:247] devx adapter 0xc92d15106d80: Failed to register user memory. Got errno=UNKNOWN-errno14 (14)
+[2026-08-12 19:42:09:211109][111675584][DOCA][ERR][CORE][doca_umem.cpp:343] Failed to register umem with exception:
+[2026-08-12 19:42:09:211121][111675584][DOCA][ERR][CORE][doca_umem.cpp:343] DOCA exception [DOCA_ERROR_DRIVER] with message Failed to register user memory
+[2026-08-12 19:42:09:211137][111675584][DOCA][ERR][CORE][doca_mmap.cpp:390] Failed to initialize mkey: failed to create memory region with exception:
+[2026-08-12 19:42:09:211141][111675584][DOCA][ERR][CORE][doca_mmap.cpp:390] DOCA exception [DOCA_ERROR_DRIVER] with message priv_doca_umem constructor failed
+[2026-08-12 19:42:09:211143][111675584][DOCA][ERR][CORE][doca_mmap.cpp:563] Mmap 0xc92d15fd6f80: Failed to initialize device=0xc92d15107340. err=DOCA_ERROR_DRIVER
+[2026-08-12 19:42:09:211146][111675584][DOCA][ERR][CORE][doca_mmap.cpp:605] Mmap 0xc92d15fd6f80: Failed to initialize memory range. Failed to register MR for device with id: 1. err=DOCA_ERROR_DRIVER
+[2026-08-12 19:42:09:211149][111675584][DOCA][ERR][ROUTENIC_GPUNETIO_CLASSIFIER][gpunetio_classifier_main.c:54][main] routenic_classifier_launch failed: DOCA Driver call failure
+routeNIC Experiment 2: real hardware bring-up test
+  GPU: 0000000f:01:00.0   NIC: 0000:01:00.0   bound: 12s
+  Send a real UDP packet to this NIC's IP during the run to exercise classify_batch() end to end.
+
+=== CONTROL TEST: NVIDIA's own unmodified gpunetio_simple_receive sample, same GPU/NIC ===
+[2026-08-12 19:43:02:741163][3019675840][DOCA][INF][CORE][doca_log.cpp:900] DOCA version 3.3.0109
+[2026-08-12 19:43:02:741214][3019675840][DOCA][INF][GPUNETIO_SIMPLE_RECEIVE][gpunetio_simple_receive_main.c:198][main] Starting the sample
+[2026-08-12 19:43:03:174835][3019675840][DOCA][INF][GPUNETIO_SIMPLE_RECEIVE][gpunetio_simple_receive_main.c:240][main] Sample configuration:
+	GPU 0000000f:01:00.0
+	NIC 0000:01:00.0
+	Shared QP exec scope Block
+	
+[2026-08-12 19:43:03:188478][3019675840][DOCA][WRN][FLOW][engine_model.c:88] adapting queue depth to 128.
+[2026-08-12 19:43:03:294976][3019675840][DOCA][WRN][FLOW][hws_port.c:906] ARGUMENT_256B resource doesn't exist, skip creating NAT64 actions
+[2026-08-12 19:43:03:304698][3019675840][DOCA][INF][GPUNETIO_SIMPLE_RECEIVE][gpunetio_simple_receive_sample.c:487][create_rxq] Creating Sample Eth Rxq
+[2026-08-12 19:43:03:307256][3019675840][DOCA][INF][GPUNETIO_SIMPLE_RECEIVE][gpunetio_simple_receive_sample.c:543][create_rxq] Mapping receive queue buffer (0x32ee00000 size 33554432B) with nvidia-peermem mode
+[2026-08-12 19:43:03:307317][3019675840][DOCA][ERR][CORE][linux_devx_adapter.cpp:247] devx adapter 0xb31dcc0e8740: Failed to register user memory. Got errno=UNKNOWN-errno14 (14)
+[2026-08-12 19:43:03:307410][3019675840][DOCA][ERR][CORE][doca_umem.cpp:343] Failed to register umem with exception:
+[2026-08-12 19:43:03:307424][3019675840][DOCA][ERR][CORE][doca_umem.cpp:343] DOCA exception [DOCA_ERROR_DRIVER] with message Failed to register user memory
+[2026-08-12 19:43:03:307446][3019675840][DOCA][ERR][CORE][doca_mmap.cpp:390] Failed to initialize mkey: failed to create memory region with exception:
+[2026-08-12 19:43:03:307453][3019675840][DOCA][ERR][CORE][doca_mmap.cpp:390] DOCA exception [DOCA_ERROR_DRIVER] with message priv_doca_umem constructor failed
+[2026-08-12 19:43:03:307457][3019675840][DOCA][ERR][CORE][doca_mmap.cpp:563] Mmap 0xb31dccfb39c0: Failed to initialize device=0xb31dcc0e8d00. err=DOCA_ERROR_DRIVER
+[2026-08-12 19:43:03:307461][3019675840][DOCA][ERR][CORE][doca_mmap.cpp:605] Mmap 0xb31dccfb39c0: Failed to initialize memory range. Failed to register MR for device with id: 1. err=DOCA_ERROR_DRIVER
+[2026-08-12 19:43:03:307496][3019675840][DOCA][ERR][GPUNETIO_SIMPLE_RECEIVE][gpunetio_simple_receive_sample.c:578][create_rxq] Failed to start mmap DOCA Driver call failure
+[2026-08-12 19:43:03:307500][3019675840][DOCA][INF][GPUNETIO_SIMPLE_RECEIVE][gpunetio_simple_receive_sample.c:403][destroy_rxq] Destroying Rxq
+[2026-08-12 19:43:04:417220][3019675840][DOCA][ERR][GPUNETIO_SIMPLE_RECEIVE][gpunetio_simple_receive_sample.c:693][gpunetio_simple_receive] Function create_rxq returned Bad State
+[2026-08-12 19:43:04:417248][3019675840][DOCA][INF][GPUNETIO_SIMPLE_RECEIVE][gpunetio_simple_receive_sample.c:403][destroy_rxq] Destroying Rxq
+timeout: the monitored command dumped core
