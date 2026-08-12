@@ -1,0 +1,47 @@
+goos: linux
+goarch: arm64
+pkg: github.com/vllm-project/semantic-router/routeNIC/control-plane/software_baseline_bench
+BenchmarkRealKeywordClassify 	  165596	     42025 ns/op	     980 B/op	      22 allocs/op
+PASS
+ok  	github.com/vllm-project/semantic-router/routeNIC/control-plane/software_baseline_bench	7.292s
+
+=== per-query breakdown ===
+goos: linux
+goarch: arm64
+pkg: github.com/vllm-project/semantic-router/routeNIC/control-plane/software_baseline_bench
+BenchmarkRealKeywordClassifyPerQuery/please_review_this_code_for_bugs         	   48861	      4978 ns/op	      96 B/op	       7 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/can_you_debug_this_function_for_me       	   54829	      4512 ns/op	     128 B/op	       8 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/explain_gradient_descent_in_machine_lear 	   23156	     10517 ns/op	     136 B/op	       8 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/this_is_urgent,_please_respond_immediate 	    3678	     66701 ns/op	     136 B/op	       8 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/what_is_my_credit_card_balance           	    5076	     44333 ns/op	    1752 B/op	      38 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/AWS_SECRET_is_exposed_in_the_log_file    	    6878	     43078 ns/op	    1792 B/op	      39 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/what's_the_weather_like_today            	    5142	     40765 ns/op	    2016 B/op	      43 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/tell_me_a_joke_about_cats                	   10000	     25547 ns/op	    1888 B/op	      43 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/how_do_I_bake_sourdough_bread            	    7504	     27577 ns/op	    1752 B/op	      37 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/recommend_a_good_science_fiction_novel   	    5548	     52791 ns/op	    2768 B/op	      52 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/I_am_debugging_the_algorithm_right_now   	   68214	      4037 ns/op	     136 B/op	       8 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/we_are_refactoring_the_codebase_this_wee 	   84314	      3718 ns/op	     104 B/op	       7 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/the_model_was_trained_on_a_large_dataset 	   43461	      7453 ns/op	     108 B/op	       7 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/our_classifiers_need_retraining          	   62413	      4998 ns/op	     104 B/op	       7 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/gradient_updates_during_training_are_uns 	   42316	      6624 ns/op	     136 B/op	       8 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/this_is_urgnet,_please_help              	   10000	     29145 ns/op	     104 B/op	       7 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/we_have_an_emergancy_on_the_production_s 	    8541	     32589 ns/op	     104 B/op	       7 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/asp,_need_this_done_now                  	   14402	     17182 ns/op	      96 B/op	       7 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/immediat_action_required                 	   10000	     20602 ns/op	     104 B/op	       7 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/I_forgot_my_passwrod_again               	    8860	     33733 ns/op	    1832 B/op	      37 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/please_don't_share_your_cerdit_card_numb 	    7182	     47381 ns/op	    3056 B/op	      61 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/my_social_securty_number_was_stolen      	    5316	     48057 ns/op	    2400 B/op	      43 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/the_api_ky_was_rotated_yesterday         	    4353	     57383 ns/op	    1488 B/op	      28 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/AWS_SECRET_must_never_be_logged          	    4924	     50627 ns/op	    2160 B/op	      45 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/aws_secret_must_never_be_logged          	    5050	     50323 ns/op	    2144 B/op	      43 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/API_KEY_rotation_policy                  	    5784	     43404 ns/op	    1344 B/op	      26 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/api_key_rotation_policy                  	    5775	     42937 ns/op	    1328 B/op	      24 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/PRIVATE_KEY_leaked_in_the_repo           	    5103	     48370 ns/op	    1776 B/op	      37 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/private_key_leaked_in_the_repo           	    5196	     48496 ns/op	    1760 B/op	      35 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/urgent:_server_is_down,_respond_immediat 	    3676	     66683 ns/op	     136 B/op	       8 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/urgent:_please_update_my_credit_card_on_ 	    3397	     71962 ns/op	     104 B/op	       7 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/Hi_team,_this_is_urgent_—_the_neural_n   	   15675	     15429 ns/op	     104 B/op	       7 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/Not_urgent,_just_wondering_if_anyone_has 	   24674	      9798 ns/op	     128 B/op	       8 allocs/op
+BenchmarkRealKeywordClassifyPerQuery/Emergency:_the_password_reset_endpoint_i 	    1844	    224824 ns/op	     144 B/op	       8 allocs/op
+PASS
+ok  	github.com/vllm-project/semantic-router/routeNIC/control-plane/software_baseline_bench	11.174s

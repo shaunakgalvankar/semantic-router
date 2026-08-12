@@ -29,8 +29,9 @@ why.
 ```
 routeNIC/
 ├── control-plane/     # orchestration, config, accuracy studies, metrics — mostly host-side Python/C, no DOCA hardware required to run
-│   ├── accuracy_study/ software-only accuracy/tolerance study for the DPA-adapted decision algorithm (Experiment 1's control-side proof)
-│   └── bench/           latency/throughput/jitter/CPU-free-fraction/GPU-energy measurement harness
+│   ├── accuracy_study/         software-only accuracy/tolerance study for the DPA-adapted decision algorithm (Experiment 1's control-side proof)
+│   ├── software_baseline_bench/ real benchmark of the ACTUAL router's KeywordClassifier (imported live via go.mod replace, not reimplemented) — the software side of docs/BENCHMARK_COMPARISON.md
+│   └── bench/                   latency/throughput/jitter/CPU-free-fraction/GPU-energy measurement harness
 ├── data-plane/        # the actual offloaded code: DPA kernels, CUDA/GPUNetIO, DOCA Flow rules
 │   ├── dpa_decision_fastpath/           Experiment 1 — adapted decision/keyword algorithm running on the BF3 DPA
 │   ├── gpunetio_persistent_classifier/  Experiment 2 — persistent CUDA kernel + GPU-triggered RDMA receive
@@ -52,8 +53,8 @@ consumer to generalize from, would be structure with nothing to justify it.
 
 | # | Experiment | Directory | Status |
 | --- | --- | --- | --- |
-| 1 | DPA-adapted decision fast path + accuracy/tolerance study | `data-plane/dpa_decision_fastpath/`, `control-plane/accuracy_study/` | **Hardware-validated.** Accuracy study runs now (pure software, real measured numbers). DPA kernel + launcher actually run against the lab's live BF3 DPA — 6/6 real test cases passed (`data-plane/dpa_decision_fastpath/real_run_output.txt`). Batched/RDMA-triggered invocation still not wired up. |
-| 2 | GPUNetIO persistent classifier kernel | `data-plane/gpunetio_persistent_classifier/` | Built and run for real against live GB10+ConnectX-7 hardware — 3 real bugs found and fixed (device never opened, no flow/pipe/packet-buffer setup, kernel too large to link). Now blocked on a host-level GPUDirect RDMA registration failure, confirmed via a clean control test to also affect NVIDIA's own unmodified sample on this host — not an application bug. See experiment doc. |
+| 1 | DPA-adapted decision fast path + accuracy/tolerance study | `data-plane/dpa_decision_fastpath/`, `control-plane/accuracy_study/` | **Hardware-validated + benchmarked.** 6/6 correctness tests pass on real BF3 DPA. Real throughput benchmark against the real software baseline: naive 19.7ms/launch → 1.25ms after reusing the completion sync event (15.8x) → **13.7–18.7µs/request amortized after batching (beats the 42µs/op software baseline)**. See `docs/BENCHMARK_COMPARISON.md`. RDMA-triggered (as opposed to benchmark-driven) invocation still not wired up. |
+| 2 | GPUNetIO persistent classifier kernel | `data-plane/gpunetio_persistent_classifier/` | Built and run for real against live GB10+ConnectX-7 hardware — 3 real bugs found and fixed (device never opened, no flow/pipe/packet-buffer setup, kernel too large to link). Blocked on a host-level GPUDirect RDMA registration failure — confirmed via a clean control test to also affect NVIDIA's own unmodified sample, and `sudo modprobe nvidia-peermem` fails at the kernel level with no diagnosable cause (version/vermagic all match). Likely a genuine GB10 platform limitation, not an application bug. See experiment doc. |
 | 3 | ASAP² tenant/recipe flow steering | `data-plane/asap2_flow_routing/` | **Hardware-validated.** Pipe/entry install actually run against a live ConnectX-7 port — PASS, all entries confirmed installed (`data-plane/asap2_flow_routing/hw_test/`). Sending real VLAN-tagged traffic through the installed rules to confirm the steering decision itself is still open. |
 | 4 | Cascade classifier (DPU gate + GPU fallback) | `data-plane/cascade_classifier/` | Scaffolded; depends on Experiment 1's adapted classifier as the cheap gate. |
 | 5 | Symmetric response-path offload | `data-plane/response_path_offload/` | Scaffolded; mirrors Experiment 2's mechanism in the outbound direction. |
@@ -79,4 +80,5 @@ instead of a hardware-availability workaround, and it's exactly what
 See `docs/architecture.md` for the full system design, and each
 `docs/experiments/NN-*.md` for a single experiment's mechanism, risk, and
 metrics. `control-plane/accuracy_study/` is the one piece with no hardware
-dependency at all — run it first.
+dependency at all — run it first. For the real software-vs-hardware
+performance comparison, see `docs/BENCHMARK_COMPARISON.md`.

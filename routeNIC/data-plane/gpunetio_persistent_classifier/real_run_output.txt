@@ -37,3 +37,20 @@ routeNIC Experiment 2: real hardware bring-up test
 [2026-08-12 19:43:04:417220][3019675840][DOCA][ERR][GPUNETIO_SIMPLE_RECEIVE][gpunetio_simple_receive_sample.c:693][gpunetio_simple_receive] Function create_rxq returned Bad State
 [2026-08-12 19:43:04:417248][3019675840][DOCA][INF][GPUNETIO_SIMPLE_RECEIVE][gpunetio_simple_receive_sample.c:403][destroy_rxq] Destroying Rxq
 timeout: the monitored command dumped core
+
+=== nvidia-peermem load attempt ===
+$ sudo modprobe nvidia-peermem
+modprobe: ERROR: could not insert 'nvidia_peermem': Invalid argument
+
+$ sudo dmesg -C && sudo modprobe nvidia-peermem && sudo dmesg
+(dmesg output: EMPTY -- no kernel log at all for the failed load)
+
+$ modinfo nvidia | grep -i version
+version:        580.159.03
+$ modinfo nvidia-peermem | grep -i version
+version:        580.159.03
+$ modinfo nvidia-peermem | grep vermagic
+vermagic:       6.17.0-1021-nvidia SMP preempt mod_unload modversions aarch64
+$ uname -r
+6.17.0-1021-nvidia
+(vermagic matches running kernel exactly; nvidia/nvidia-peermem versions match each other exactly)

@@ -116,3 +116,44 @@ __dpa_global__ void routenic_fastpath_evaluate(uint64_t text_addr,
 			      num_rules,
 			      text_len);
 }
+
+/*
+ * Batched variant: one launch evaluates up to FASTPATH_MAX_BATCH requests at
+ * once, one DPA thread per request (doca_dpa_dev_thread_rank() — real,
+ * hardware-assigned per-thread rank within this launch, not a host-side
+ * loop). Added after benchmarking routenic_fastpath_evaluate() above on
+ * real BF3 hardware: even after fixing the dominant per-launch sync-event
+ * creation cost (see fastpath_launcher.c's
+ * routenic_fastpath_launch_reuse_event()), a single-request-per-launch
+ * shape still pays DPA kernel dispatch overhead once per request. Batching
+ * amortizes that fixed cost across every thread in the launch instead.
+ *
+ * text_addrs/text_lens/out_matched_addrs are each arrays of `batch_size`
+ * entries in DPA-accessible memory, indexed by thread rank — the host
+ * builds these exactly like it builds one request's args for the
+ * single-request kernel, just for many requests at once.
+ */
+__dpa_global__ void routenic_fastpath_evaluate_batch(uint64_t text_addrs_arr,
+						       uint64_t text_lens_arr,
+						       uint64_t rules_addr,
+						       uint32_t num_rules,
+						       uint64_t out_matched_addrs_arr,
+						       uint32_t batch_size)
+{
+	unsigned int rank = doca_dpa_dev_thread_rank();
+
+	if (rank >= batch_size)
+		return;
+
+	const uint64_t *text_addrs = (const uint64_t *)text_addrs_arr;
+	const uint32_t *text_lens = (const uint32_t *)text_lens_arr;
+	const uint64_t *out_matched_addrs = (const uint64_t *)out_matched_addrs_arr;
+	const struct fastpath_keyword_rule *rules = (const struct fastpath_keyword_rule *)rules_addr;
+
+	const uint8_t *text = (const uint8_t *)text_addrs[rank];
+	uint32_t text_len = text_lens[rank];
+	uint8_t *out_matched = (uint8_t *)out_matched_addrs[rank];
+
+	for (uint32_t r = 0; r < num_rules; r++)
+		out_matched[r] = (uint8_t)fastpath_eval_rule(&rules[r], text, text_len);
+}

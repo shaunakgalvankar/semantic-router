@@ -1,0 +1,16 @@
+# Compact sample run (50 iterations) — per-request DOCA_DPA_DEV_LOG_INFO
+# device log lines filtered out for size (would be ~34,000 lines otherwise).
+# The headline numbers in docs/BENCHMARK_COMPARISON.md and this experiment's
+# own doc come from larger 300/500-iteration runs (17,000/10,200 samples),
+# which is why they differ slightly from the small-sample numbers below —
+# see both docs' note on batched-mean instability at low sample counts;
+# median (~200us/launch) is consistent across every run size tried.
+[2026-08-12 22:18:42:874797][4079918848][DOCA][INF][doca_log.cpp:633] DOCA version 3.2.1025
+[2026-08-12 22:18:42:882520][4079918848][DOCA][WRN][linux_device_adapter.cpp:1815] Host PF is disabled
+routeNIC Experiment 1 bench: 50 iterations x 34 queries = 1700 real DPA launches
+routeNIC Experiment 1 bench, single-request-per-launch (real DPA hardware, 1700 samples):
+  mean=1257933 ns  p50=1223929 ns  p95=1367332 ns  p99=1433662 ns
+  wall clock=2.139s  throughput=794.9 launches/sec
+routeNIC Experiment 1 bench, batched (34 requests/launch, real DPA hardware, 50 launches):
+  mean=2802726 ns/launch  (82433 ns/request amortized)  p50=197131 ns/launch
+  wall clock=0.140s  throughput=12130.8 requests/sec

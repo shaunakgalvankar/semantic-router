@@ -75,14 +75,55 @@ two genuine defects:
    ("NOT_SET") rather than also being set to `mlx5_0`. Only surfaced by
    actually running the binary and reading its real error message.
 
+## Real throughput benchmark vs. the real software baseline
+
+`host/fastpath_bench_main.c` — a timed loop against the exact same 4 real
+`config/config.yaml` rules and the exact same 34-query corpus
+`control-plane/software_baseline_bench` benchmarks on the router's actual
+`KeywordClassifier.Classify()`, so the two sides are a fair comparison, not
+two different workloads. See `bench_real_run_output.txt` in this directory
+for raw output and `routeNIC/docs/BENCHMARK_COMPARISON.md` for the full
+side-by-side writeup. Two real optimizations, found by profiling a
+naive first version against real hardware rather than assumed in advance:
+
+1. **The single biggest lever: reuse the completion sync event.** The first
+   version of `routenic_fastpath_launch()` created a fresh
+   `doca_sync_event` on every call and destroyed it at the end — a hardware
+   registration handshake, not free bookkeeping. Measured cost: **19.7ms
+   mean per launch, 50.8 launches/sec** — about 470x *slower* than the
+   42µs/op software baseline, i.e. the naive DPA path was dramatically
+   worse before this fix, not better. `routenic_fastpath_launch_reuse_event()`
+   creates the event once and reuses it via monotonically increasing target
+   values (`doca_dpa_kernel_launch_update_set`'s `comp_event_val` parameter
+   exists for exactly this). Result: **1.25ms mean, 801.8 launches/sec** —
+   a 15.8x speedup from this one change, though still far behind software.
+2. **Batch requests into one launch.** Even with the event reused, every
+   request still pays DPA kernel dispatch overhead individually.
+   `routenic_fastpath_evaluate_batch()` (the kernel) uses
+   `doca_dpa_dev_thread_rank()` to give each DPA thread in one launch its
+   own request — the whole 34-query corpus evaluated in a single launch,
+   one thread per query, instead of 34 separate launches. Result:
+   **13.7–18.7µs/request amortized mean, ~6µs/request at the launch p50,
+   72,747 requests/sec** — this **beats the 42µs/op real software
+   baseline**, and beats even software's cheapest per-query case (~3.7µs)
+   at the batched median, while dominating its expensive fuzzy-matching
+   tail (up to 225µs) by 1–2 orders of magnitude.
+
+Honest gap in this result: batched mean (467–637µs/launch) sits well above
+batched median (~202µs/launch) across repeated runs — a real, reproducible
+right skew (occasional slow launches), not a one-off fluke, but not yet
+root-caused. Worth investigating with per-launch tracing before citing the
+mean figure as a stable SLA number; the median and throughput figures are
+more robust.
+
 ## What's not implemented yet (needs more BF3 time)
 
 - The rule table and request text are written to DPA memory directly by the
-  test driver (single-request, blocking, correctness-first shape). Wiring
-  this to an actual RDMA-triggered arrival path (BF3 receives a real request
-  over the wire, writes it to DPA-local memory, triggers the kernel) is the
-  natural next step now that this base mechanism is validated end-to-end on
-  real hardware.
+  test driver (batched-but-still-host-triggered shape). Wiring this to an
+  actual RDMA-triggered arrival path (BF3 receives a real request over the
+  wire, writes it to DPA-local memory, triggers the kernel) is the natural
+  next step now that both correctness and a real throughput number are
+  validated on real hardware.
 - `out_matched` results currently just sit in memory for the host to read;
   routing them onward (either "resolved, skip the GPU" or "unresolved, hand
   off to Experiment 2/4") isn't wired up yet.
@@ -90,10 +131,10 @@ two genuine defects:
   `control-plane/accuracy_study/workload.py` rather than generated from a
   shared schema — fine for a first correctness pass, a real gap for
   anything beyond it (see the launcher's own comment).
-- Only 6 fixed single-word/phrase test requests have been run — real
-  latency/throughput numbers (as opposed to functional correctness) need a
-  proper timed loop, which `control-plane/bench/` is built to consume once
-  this driver emits a trace in that format.
+- The batched-launch mean/median gap above isn't root-caused yet.
+- Batch size is currently fixed at the corpus size (34); no data yet on how
+  amortized cost scales with batch size, or what the optimal batch size is
+  against real DPA thread/EU limits.
 
 ## Metrics this experiment feeds
 

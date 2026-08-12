@@ -149,3 +149,105 @@ destroy_comp_event:
 		DOCA_ERROR_PROPAGATE(result, tmp_result);
 	return result;
 }
+
+/*
+ * Throughput-oriented variant of routenic_fastpath_launch() above, for a
+ * caller doing many launches back to back (a real benchmark, or a real
+ * production request-serving loop) rather than one isolated call.
+ *
+ * Measured on real BF3 hardware: routenic_fastpath_launch() above averaged
+ * ~19.7ms per call (50.8 launches/sec) — roughly 470x SLOWER than the real
+ * software keyword matcher it's meant to beat. Creating and destroying a
+ * doca_sync_event on every single call (that function's whole body) is a
+ * hardware registration handshake, not free bookkeeping, and dominates
+ * every other cost in the kernel by orders of magnitude. This variant
+ * creates the completion event once, reuses it via monotonically increasing
+ * target values (the real DOCA DPA idiom sync events are designed for —
+ * doca_dpa_kernel_launch_update_set's comp_event_val parameter exists
+ * exactly so callers don't have to recreate the event per launch), and
+ * lets the caller destroy it once when done.
+ */
+doca_error_t routenic_fastpath_create_reusable_completion_event(struct dpa_resources *resources,
+								  struct doca_sync_event **out_comp_event)
+{
+	return create_doca_dpa_completion_sync_event(resources->pf_dpa_ctx, resources->pf_doca_device, out_comp_event, NULL);
+}
+
+doca_error_t routenic_fastpath_launch_reuse_event(struct dpa_resources *resources,
+						    struct doca_sync_event *comp_event,
+						    uint64_t target_value,
+						    uint64_t request_text_dpa_addr,
+						    uint32_t request_len,
+						    uint64_t rules_dpa_addr,
+						    uint32_t num_rules,
+						    uint64_t out_matched_dpa_addr)
+{
+	doca_error_t result;
+
+	result = doca_dpa_kernel_launch_update_set(resources->pf_dpa_ctx,
+						    NULL,
+						    0,
+						    comp_event,
+						    target_value,
+						    1,
+						    &routenic_fastpath_evaluate,
+						    request_text_dpa_addr,
+						    request_len,
+						    rules_dpa_addr,
+						    num_rules,
+						    out_matched_dpa_addr);
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Failed to launch routenic_fastpath_evaluate: %s", doca_error_get_descr(result));
+		return result;
+	}
+
+	return doca_sync_event_wait_gt(comp_event, target_value - 1, SYNC_EVENT_MASK_FFS);
+}
+
+extern doca_dpa_func_t routenic_fastpath_evaluate_batch;
+
+/*
+ * Batched launch: evaluates `batch_size` requests in ONE kernel launch (one
+ * DPA thread per request, doca_dpa_dev_thread_rank() inside the kernel —
+ * see fastpath_kernel_dev.c's routenic_fastpath_evaluate_batch()), instead
+ * of `batch_size` separate launches. Reuses the same completion-event
+ * pattern as routenic_fastpath_launch_reuse_event() above.
+ *
+ * text_addrs_arr/text_lens_arr/out_matched_addrs_arr must already be
+ * H2D-copied to DPA memory by the caller — this function only launches and
+ * waits, matching every other function in this file's division of labor
+ * between "who owns DPA memory" (the caller, which has the doca_dpa handle
+ * for the whole run) and "who launches" (this file).
+ */
+doca_error_t routenic_fastpath_launch_batch_reuse_event(struct dpa_resources *resources,
+							  struct doca_sync_event *comp_event,
+							  uint64_t target_value,
+							  uint64_t text_addrs_arr,
+							  uint64_t text_lens_arr,
+							  uint64_t rules_dpa_addr,
+							  uint32_t num_rules,
+							  uint64_t out_matched_addrs_arr,
+							  uint32_t batch_size)
+{
+	doca_error_t result;
+
+	result = doca_dpa_kernel_launch_update_set(resources->pf_dpa_ctx,
+						    NULL,
+						    0,
+						    comp_event,
+						    target_value,
+						    batch_size, /* one DPA thread per request in the batch */
+						    &routenic_fastpath_evaluate_batch,
+						    text_addrs_arr,
+						    text_lens_arr,
+						    rules_dpa_addr,
+						    num_rules,
+						    out_matched_addrs_arr,
+						    batch_size);
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Failed to launch routenic_fastpath_evaluate_batch: %s", doca_error_get_descr(result));
+		return result;
+	}
+
+	return doca_sync_event_wait_gt(comp_event, target_value - 1, SYNC_EVENT_MASK_FFS);
+}

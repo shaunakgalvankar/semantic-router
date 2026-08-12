@@ -56,12 +56,29 @@ GPUDirect Async), not something invented for this project.
   unmodified `gpunetio_simple_receive` sample, built fresh via its real
   `meson`/`ninja` project and pointed at the exact same GPU/NIC PCI
   addresses, fails with the byte-for-byte identical error.** That rules out
-  application code as the cause. The kernel `nvidia-peermem.ko` exists on
-  this system but is not currently loaded (`lsmod` confirms); loading it
-  (`sudo modprobe nvidia-peermem`) is the next concrete thing to try, but
-  is a system-level kernel module change on shared lab hardware, not
-  something to do without asking first. Raw output from both runs (this
-  experiment's own test and the control test):
+  application code as the cause.
+
+  **Update: `sudo modprobe nvidia-peermem` was tried and failed at the
+  kernel level** (`ERROR: could not insert 'nvidia_peermem': Invalid
+  argument`), with genuinely nothing else to go on: `dmesg` (cleared and
+  retried for a clean capture) and `journalctl -k` show zero log output for
+  the failed load — not even the kernel's own rejection reason — and the
+  loaded `nvidia.ko`/`nvidia-peermem.ko` versions match exactly
+  (`580.159.03` both, confirmed via `modinfo` and `/proc/driver/nvidia/version`),
+  ruling out the most common cause (driver/module version skew). `vermagic`
+  also matches the running kernel exactly, ruling out a kernel-version
+  mismatch. This looks like a genuine platform limitation for this specific
+  GB10 + DOCA 3.3 + driver 580.159.03 combination — GB10 is a coherent
+  NVLink-C2C SoC package, not a conventional discrete PCIe GPU, and its real
+  GPUDirect RDMA mechanism for an *external* RDMA peer (the BF3, over the
+  wire) may not be the traditional `nvidia-peermem` PCIe peer-to-peer model
+  DOCA is defaulting to here. Root-causing further would need either NVIDIA
+  vendor support or a driver-level debugging session beyond what's safe to
+  attempt unilaterally on shared lab hardware — this is where the
+  investigation stopped.
+
+  Raw output from all three runs (this experiment's own test, the control
+  test, and the failed module load):
   `real_run_output.txt` in this experiment's directory.
 
 Build and run it yourself with `./build_test.sh` then
