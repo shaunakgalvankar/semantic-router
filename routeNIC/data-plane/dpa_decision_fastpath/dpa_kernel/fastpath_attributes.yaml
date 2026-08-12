@@ -1,0 +1,5 @@
+ Feature_list:
+# routeNIC fast-path kernel requires no special DPA attributes — plain
+# compute over caller-supplied memory, no RDMA/comm channel primitives used
+# directly inside the kernel itself yet. See the experiment README for how
+# this composes with a doca_rdma-triggered invocation.

@@ -1,0 +1,203 @@
+{
+  "strict": {
+    "case_mode": "strict",
+    "num_queries": 34,
+    "per_rule": {
+      "code_keywords": {
+        "tp": 6,
+        "fp": 0,
+        "fn": 0,
+        "tn": 28,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "accuracy": 1.0
+      },
+      "machine_learning": {
+        "tp": 5,
+        "fp": 0,
+        "fn": 1,
+        "tn": 28,
+        "precision": 1.0,
+        "recall": 0.8333333333333334,
+        "f1": 0.9090909090909091,
+        "accuracy": 0.9705882352941176
+      },
+      "urgent_keywords": {
+        "tp": 6,
+        "fp": 0,
+        "fn": 4,
+        "tn": 24,
+        "precision": 1.0,
+        "recall": 0.6,
+        "f1": 0.7499999999999999,
+        "accuracy": 0.8823529411764706
+      },
+      "fuzzy_sensitive_keywords": {
+        "tp": 3,
+        "fp": 0,
+        "fn": 3,
+        "tn": 28,
+        "precision": 1.0,
+        "recall": 0.5,
+        "f1": 0.6666666666666666,
+        "accuracy": 0.9117647058823529
+      },
+      "case_sensitive_secrets": {
+        "tp": 4,
+        "fp": 0,
+        "fn": 0,
+        "tn": 30,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "accuracy": 1.0
+      }
+    },
+    "decision": {
+      "tp": 15,
+      "fp": 0,
+      "fn": 5,
+      "tn": 14,
+      "precision": 1.0,
+      "recall": 0.75,
+      "f1": 0.8571428571428571,
+      "accuracy": 0.8529411764705882
+    },
+    "decision_mismatches": [
+      {
+        "query": "the model was trained on a large dataset",
+        "baseline": true,
+        "adapted": false
+      },
+      {
+        "query": "this is urgnet, please help",
+        "baseline": true,
+        "adapted": false
+      },
+      {
+        "query": "we have an emergancy on the production system",
+        "baseline": true,
+        "adapted": false
+      },
+      {
+        "query": "asp, need this done now",
+        "baseline": true,
+        "adapted": false
+      },
+      {
+        "query": "immediat action required",
+        "baseline": true,
+        "adapted": false
+      }
+    ]
+  },
+  "folded": {
+    "case_mode": "folded",
+    "num_queries": 34,
+    "per_rule": {
+      "code_keywords": {
+        "tp": 6,
+        "fp": 0,
+        "fn": 0,
+        "tn": 28,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "accuracy": 1.0
+      },
+      "machine_learning": {
+        "tp": 5,
+        "fp": 0,
+        "fn": 1,
+        "tn": 28,
+        "precision": 1.0,
+        "recall": 0.8333333333333334,
+        "f1": 0.9090909090909091,
+        "accuracy": 0.9705882352941176
+      },
+      "urgent_keywords": {
+        "tp": 6,
+        "fp": 0,
+        "fn": 4,
+        "tn": 24,
+        "precision": 1.0,
+        "recall": 0.6,
+        "f1": 0.7499999999999999,
+        "accuracy": 0.8823529411764706
+      },
+      "fuzzy_sensitive_keywords": {
+        "tp": 3,
+        "fp": 0,
+        "fn": 3,
+        "tn": 28,
+        "precision": 1.0,
+        "recall": 0.5,
+        "f1": 0.6666666666666666,
+        "accuracy": 0.9117647058823529
+      },
+      "case_sensitive_secrets": {
+        "tp": 4,
+        "fp": 3,
+        "fn": 0,
+        "tn": 27,
+        "precision": 0.5714285714285714,
+        "recall": 1.0,
+        "f1": 0.7272727272727273,
+        "accuracy": 0.9117647058823529
+      }
+    },
+    "decision": {
+      "tp": 15,
+      "fp": 3,
+      "fn": 5,
+      "tn": 11,
+      "precision": 0.8333333333333334,
+      "recall": 0.75,
+      "f1": 0.7894736842105262,
+      "accuracy": 0.7647058823529411
+    },
+    "decision_mismatches": [
+      {
+        "query": "the model was trained on a large dataset",
+        "baseline": true,
+        "adapted": false
+      },
+      {
+        "query": "this is urgnet, please help",
+        "baseline": true,
+        "adapted": false
+      },
+      {
+        "query": "we have an emergancy on the production system",
+        "baseline": true,
+        "adapted": false
+      },
+      {
+        "query": "asp, need this done now",
+        "baseline": true,
+        "adapted": false
+      },
+      {
+        "query": "immediat action required",
+        "baseline": true,
+        "adapted": false
+      },
+      {
+        "query": "aws_secret must never be logged",
+        "baseline": false,
+        "adapted": true
+      },
+      {
+        "query": "api_key rotation policy",
+        "baseline": false,
+        "adapted": true
+      },
+      {
+        "query": "private_key leaked in the repo",
+        "baseline": false,
+        "adapted": true
+      }
+    ]
+  }
+}
