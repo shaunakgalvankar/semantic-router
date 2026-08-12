@@ -1,0 +1,22 @@
+[2026-08-12 17:44:34:826676][2333122304][DOCA][INF][doca_log.cpp:633] DOCA version 3.2.1025
+[2026-08-12 17:44:34:834179][2333122304][DOCA][WRN][linux_device_adapter.cpp:1815] Host PF is disabled
+routeNIC Experiment 1: real DPA fast-path kernel test (5 rules, 6 requests)
+/8000/[DOCA][DPA DEVICE][INF] routeNIC fast path: evaluated 5 rules against a 39-byte request
+[2026-08-12 17:44:35:154999][2333122304][DOCA][WRN][doca_mmap.cpp:2100] Mmap 0xb0542673f900: Memory range isn't aligned to 64B - addr=0xffffc41e6070. For best performance using CPU memory, align address to 64B (cache-line size). For best performance using GPU memory, align address to 64KB (page size)
+  please help debug this function, thanks                 expected=[1,0,0,0,0] got=[1,0,0,0,0]  PASS
+/8000/[DOCA][DPA DEVICE][INF] routeNIC fast path: evaluated 5 rules against a 48-byte request
+[2026-08-12 17:44:35:174553][2333122304][DOCA][WRN][doca_mmap.cpp:2100] Mmap 0xb0542673f900: Memory range isn't aligned to 64B - addr=0xffffc41e6070. For best performance using CPU memory, align address to 64B (cache-line size). For best performance using GPU memory, align address to 64KB (page size)
+  let's discuss machine learning classifier design        expected=[0,1,0,0,0] got=[0,1,0,0,0]  PASS
+/8000/[DOCA][DPA DEVICE][INF] routeNIC fast path: evaluated 5 rules against a 30-byte request
+[2026-08-12 17:44:35:194079][2333122304][DOCA][WRN][doca_mmap.cpp:2100] Mmap 0xb0542673f900: Memory range isn't aligned to 64B - addr=0xffffc41e6070. For best performance using CPU memory, align address to 64B (cache-line size). For best performance using GPU memory, align address to 64KB (page size)
+  this is urgent, need help asap                          expected=[0,0,1,0,0] got=[0,0,1,0,0]  PASS
+/8000/[DOCA][DPA DEVICE][INF] routeNIC fast path: evaluated 5 rules against a 27-byte request
+[2026-08-12 17:44:35:213641][2333122304][DOCA][WRN][doca_mmap.cpp:2100] Mmap 0xb0542673f900: Memory range isn't aligned to 64B - addr=0xffffc41e6070. For best performance using CPU memory, align address to 64B (cache-line size). For best performance using GPU memory, align address to 64KB (page size)
+  my credit card was declined                             expected=[0,0,0,1,0] got=[0,0,0,1,0]  PASS
+/8000/[DOCA][DPA DEVICE][INF] routeNIC fast path: evaluated 5 rules against a 31-byte request
+[2026-08-12 17:44:35:233201][2333122304][DOCA][WRN][doca_mmap.cpp:2100] Mmap 0xb0542673f900: Memory range isn't aligned to 64B - addr=0xffffc41e6070. For best performance using CPU memory, align address to 64B (cache-line size). For best performance using GPU memory, align address to 64KB (page size)
+  aws_secret must never be logged                         expected=[0,0,0,0,1] got=[0,0,0,0,1]  PASS
+/8000/[DOCA][DPA DEVICE][INF] routeNIC fast path: evaluated 5 rules against a 40-byte request
+[2026-08-12 17:44:35:252769][2333122304][DOCA][WRN][doca_mmap.cpp:2100] Mmap 0xb0542673f900: Memory range isn't aligned to 64B - addr=0xffffc41e6070. For best performance using CPU memory, align address to 64B (cache-line size). For best performance using GPU memory, align address to 64KB (page size)
+  just a normal question about the weather                expected=[0,0,0,0,0] got=[0,0,0,0,0]  PASS
+routeNIC Experiment 1: 6/6 real DPA hardware test cases passed

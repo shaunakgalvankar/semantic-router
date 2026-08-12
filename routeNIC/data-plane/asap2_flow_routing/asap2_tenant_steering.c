@@ -45,9 +45,7 @@ struct routenic_tenant_route {
  * #2868) — same "which tenant, which recipe" question, answered in
  * silicon instead of Go.
  */
-static doca_error_t routenic_create_tenant_steering_pipe(struct doca_flow_port *port,
-							   struct doca_flow_fwd *default_fwd,
-							   struct doca_flow_pipe **out_pipe)
+static doca_error_t routenic_create_tenant_steering_pipe(struct doca_flow_port *port, struct doca_flow_pipe **out_pipe)
 {
 	struct doca_flow_pipe_cfg *pipe_cfg = NULL;
 	doca_error_t result;
@@ -73,7 +71,17 @@ static doca_error_t routenic_create_tenant_steering_pipe(struct doca_flow_port *
 		goto destroy_cfg;
 	}
 
-	result = doca_flow_pipe_create(pipe_cfg, default_fwd, NULL, out_pipe);
+	/* fwd must be NULL at pipe-creation time for a control pipe — the
+	 * real DOCA Flow engine rejects anything else ("fwd should be null
+	 * for control pipe", engine_pipe_control.c), confirmed by actually
+	 * running this against a live ConnectX-7 port. Every entry (including
+	 * the fail-closed catch-all, added by the caller below) supplies its
+	 * own fwd individually; that per-entry fwd IS the entire reason this
+	 * is a control pipe instead of a basic one. The original version of
+	 * this function passed a default_fwd here, which only ever looked
+	 * plausible because it type-checked — the real engine rejects it at
+	 * pipe-create time regardless of what that fwd's contents are. */
+	result = doca_flow_pipe_create(pipe_cfg, NULL, NULL, out_pipe);
 	if (result != DOCA_SUCCESS)
 		DOCA_LOG_ERR("Failed to create tenant steering pipe: %s", doca_error_get_descr(result));
 
@@ -93,6 +101,7 @@ destroy_cfg:
  */
 static doca_error_t routenic_add_tenant_entry(struct doca_flow_pipe *pipe,
 						const struct routenic_tenant_route *route,
+						void *entries_status_ctx,
 						struct doca_flow_pipe_entry **out_entry)
 {
 	struct doca_flow_match match = {0};
@@ -127,7 +136,7 @@ static doca_error_t routenic_add_tenant_entry(struct doca_flow_pipe *pipe,
 						   NULL, /* monitor */
 						   0, /* priority: entries are one-per-tenant, no overlap to break ties on */
 						   &fwd,
-						   NULL, /* usr_ctx */
+						   entries_status_ctx,
 						   out_entry);
 	if (result != DOCA_SUCCESS)
 		DOCA_LOG_ERR("Failed to add tenant entry (vlan=%u): %s", route->vlan_tci, doca_error_get_descr(result));
@@ -135,33 +144,88 @@ static doca_error_t routenic_add_tenant_entry(struct doca_flow_pipe *pipe,
 	return result;
 }
 
+/*
+ * Adds the fail-closed catch-all: a wildcard match (all-zero struct
+ * doca_flow_match, per DOCA Flow convention for "match anything") that
+ * drops, at lower precedence than every tenant entry above (tenant entries
+ * use priority 0; this uses priority 1) so it only ever fires for traffic
+ * that matched no configured tenant VLAN. Deliberately mirrors the
+ * "ClaimedNoMatch must never become passthrough" invariant from the
+ * tenant-rules design discussion (issue #2868), applied one layer lower in
+ * the stack.
+ */
+static doca_error_t routenic_add_catchall_drop_entry(struct doca_flow_pipe *pipe,
+						       void *entries_status_ctx,
+						       struct doca_flow_pipe_entry **out_entry)
+{
+	struct doca_flow_match wildcard_match = {0};
+	struct doca_flow_fwd drop_fwd = {.type = DOCA_FLOW_FWD_DROP};
+	doca_error_t result;
+
+	result = doca_flow_pipe_control_add_entry(0,
+						   pipe,
+						   &wildcard_match,
+						   NULL,
+						   NULL,
+						   NULL,
+						   NULL,
+						   NULL,
+						   NULL,
+						   1, /* lower precedence than every tenant entry (priority 0) */
+						   &drop_fwd,
+						   entries_status_ctx,
+						   out_entry);
+	if (result != DOCA_SUCCESS)
+		DOCA_LOG_ERR("Failed to add catch-all drop entry: %s", doca_error_get_descr(result));
+	return result;
+}
+
 doca_error_t routenic_asap2_tenant_steering_setup(struct doca_flow_port *port,
 						    const struct routenic_tenant_route *routes,
 						    uint32_t num_routes,
+						    void *entries_status_ctx,
 						    struct doca_flow_pipe **out_pipe)
 {
-	struct doca_flow_fwd default_fwd = {.type = DOCA_FLOW_FWD_DROP};
 	struct doca_flow_pipe *pipe = NULL;
+	struct doca_flow_pipe_entry *catchall_entry = NULL;
 	doca_error_t result;
 
 	if (num_routes > ROUTENIC_MAX_TENANTS)
 		return DOCA_ERROR_INVALID_VALUE;
 
-	/* Fail-closed default: traffic with no matching tenant VLAN is
-	 * dropped in hardware rather than falling through to an
-	 * unauthenticated software path — deliberately mirrors the
-	 * "ClaimedNoMatch must never become passthrough" invariant from the
-	 * tenant-rules design discussion (issue #2868), applied one layer
-	 * lower in the stack. */
-	result = routenic_create_tenant_steering_pipe(port, &default_fwd, &pipe);
+	result = routenic_create_tenant_steering_pipe(port, &pipe);
 	if (result != DOCA_SUCCESS)
 		return result;
 
 	for (uint32_t i = 0; i < num_routes; i++) {
 		struct doca_flow_pipe_entry *entry = NULL;
-		result = routenic_add_tenant_entry(pipe, &routes[i], &entry);
+		result = routenic_add_tenant_entry(pipe, &routes[i], entries_status_ctx, &entry);
 		if (result != DOCA_SUCCESS)
 			return result;
+	}
+
+	result = routenic_add_catchall_drop_entry(pipe, entries_status_ctx, &catchall_entry);
+	if (result != DOCA_SUCCESS)
+		return result;
+
+	/* DOCA Flow entry insertion is asynchronous: the add_entry calls
+	 * above only queue the entries (num_routes tenant entries + 1
+	 * catch-all). Nothing is actually confirmed installed in hardware
+	 * until doca_flow_entries_process() is pumped and entries_status_ctx
+	 * (an `struct entries_status *`, per DOCA Flow's own convention — see
+	 * flow_common.h/.c's check_for_valid_entry(), the entry-process
+	 * callback registered via doca_flow_cfg_set_cb_entry_process() at
+	 * doca_flow_init() time) is checked. This call, and the check against
+	 * it, were missing from the first version of this function — every
+	 * add_entry call appeared to succeed at the API level regardless of
+	 * whether hardware actually accepted the entry, which only became
+	 * visible once this code was run against a real port instead of only
+	 * syntax-checked. */
+	result = doca_flow_entries_process(
+		port, 0, 10000 /* 10ms, matches DOCA Flow samples' DEFAULT_TIMEOUT_US */, num_routes + 1);
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Failed to process tenant steering entries: %s", doca_error_get_descr(result));
+		return result;
 	}
 
 	*out_pipe = pipe;

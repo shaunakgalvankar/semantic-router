@@ -31,36 +31,59 @@ hardware steers on that tag. Extending to genuine custom-header parsing is
 a documented follow-up (`doca_flow`'s custom header parser feature), not
 assumed away.
 
-## What's implemented
+## What's implemented, and what's actually been run
 
 - `asap2_tenant_steering.c` — creates one `DOCA_FLOW_PIPE_CONTROL` pipe
   (the only DOCA Flow pipe type whose entries can each carry a distinct
   forward action, required since every tenant steers to a different recipe
   queue) and adds one hardware entry per tenant via
   `doca_flow_pipe_control_add_entry`, matching VLAN TCI and forwarding to a
-  single deterministic RSS queue per tenant. **Syntax-verified against the
-  real DOCA Flow headers on this host** — every API call, struct field, and
-  enum name in this file was checked against `/opt/mellanox/doca/include/`
-  and NVIDIA's own installed samples (`flow_hash_pipe`,
-  `flow_control_pipe`, `flow_ct_udp_query`, `flow_lpm`) rather than assumed;
-  two API guesses (a nonexistent `doca_flow_pipe_add_entry` and a
-  `DOCA_FLOW_RSS_HASH` constant that doesn't exist in this DOCA version)
-  were caught and corrected by that verification, not silently left wrong.
-- A fail-closed default forward (`DOCA_FLOW_FWD_DROP`) for traffic that
-  matches no configured tenant VLAN — deliberately mirrors the
-  "ClaimedNoMatch must never become passthrough" invariant from the
-  tenant-rules design discussion in issue #2868, one layer lower in the
+  single deterministic RSS queue per tenant, plus a fail-closed wildcard
+  catch-all entry (`DOCA_FLOW_FWD_DROP`, lower precedence than every tenant
+  entry) for traffic matching no configured tenant VLAN — deliberately
+  mirrors the "ClaimedNoMatch must never become passthrough" invariant from
+  the tenant-rules design discussion in issue #2868, one layer lower in the
   stack.
+- `hw_test/` — **actually run against a live ConnectX-7 port on this lab's
+  DGX Spark** (`enp1s0f0np0`, taken into DPDK-managed mode for the duration
+  of the run, confirmed to return cleanly to normal kernel networking
+  afterward). Built via `meson`/`ninja` against the real DOCA Flow/DPDK
+  toolchain (the only way DOCA Flow programs are ever actually built —
+  there's no simpler correct path). **Result: PASS** — pipe created, all 4
+  entries (3 tenant + 1 catch-all) installed and confirmed via
+  `doca_flow_entries_process`. Raw output: `hw_test/real_run_output.txt`.
+
+### Two real bugs this run caught that syntax-checking never would have
+
+1. **`fwd should be null for control pipe`** (a real DOCA Flow engine
+   error, not a header/syntax issue). The original code set a pipe-level
+   default `fwd` at `doca_flow_pipe_create()` time for a control pipe — the
+   engine rejects this unconditionally; control pipes require `fwd = NULL`
+   at creation, since per-entry `fwd` is the entire reason to use this pipe
+   type. Fixed by moving the fail-closed drop behavior into an explicit
+   wildcard catch-all *entry* instead of a pipe-level default.
+2. **Entries were fire-and-forget.** `doca_flow_pipe_control_add_entry()`
+   only queues an entry — nothing is confirmed installed in hardware until
+   `doca_flow_entries_process()` is pumped and a `usr_ctx` status struct is
+   checked. The original code passed `NULL` for `usr_ctx` and never called
+   `doca_flow_entries_process()` — every add_entry call would report
+   success regardless of whether hardware actually accepted anything. Fixed
+   by threading a status context through and processing entries for real.
+
+See `hw_test/README.md` for the full writeup, including the (also
+empirically-discovered, not documented anywhere obvious) real device-address
+CLI format.
 
 ## What's not implemented yet (needs the live BF3/CX7 + a gateway)
 
 - Nothing currently assigns the VLAN tags this experiment matches on — that
   requires either a real upstream gateway doing the tagging, or a synthetic
-  traffic generator standing in for one during bring-up.
-- Port/queue bring-up (`doca_flow_init`, `doca_flow_port_start`, RSS queue
-  array provisioning) isn't included here — this file is the steering logic
-  specifically, meant to be called after the standard DOCA Flow port
-  bootstrap every DOCA Flow sample on this host already demonstrates.
+  traffic generator standing in for one during bring-up. `hw_test/` proves
+  the pipe/entries install correctly in hardware; it doesn't yet send actual
+  VLAN-tagged traffic through them to confirm the steering decision itself.
+- Port/queue bring-up beyond what `hw_test/` already does (RSS queue array
+  provisioning tuned for a real multi-queue deployment, not just enough
+  queues to prove the mechanism) is still a simplification.
 
 ## Metrics this experiment feeds
 

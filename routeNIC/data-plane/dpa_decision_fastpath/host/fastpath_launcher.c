@@ -41,8 +41,14 @@ extern doca_dpa_func_t routenic_fastpath_evaluate;
  * rather than a shared schema for now (see the experiment README's "known
  * gaps" section: a real deployment would generate this table from the
  * router's actual canonical config instead of duplicating it here).
+ *
+ * Not static: the caller (fastpath_main.c) needs this to build the actual
+ * host-side buffer it H2D-copies to DPA memory at rules_dpa_addr before
+ * calling routenic_fastpath_launch() below. This function itself has no way
+ * to reach DPA memory — it has no doca_dpa handle — so it cannot and must
+ * not be the one deciding rules_dpa_addr's contents; it only marshals data.
  */
-static doca_error_t routenic_build_rule_table(struct fastpath_keyword_rule *out_rules, uint32_t *out_num_rules)
+doca_error_t routenic_build_rule_table(struct fastpath_keyword_rule *out_rules, uint32_t *out_num_rules)
 {
 	struct {
 		enum fastpath_operator op;
@@ -83,6 +89,15 @@ static doca_error_t routenic_build_rule_table(struct fastpath_keyword_rule *out_
  * `request_text`/`request_len` identify the request to evaluate;
  * `out_matched` receives one byte per rule (see fastpath_kernel_dev.c).
  *
+ * `rules_dpa_addr` must already hold `num_rules` valid
+ * `struct fastpath_keyword_rule` entries in DPA-accessible memory — the
+ * caller builds that host-side table with routenic_build_rule_table() above
+ * and H2D-copies it there (see fastpath_main.c) before calling this. This
+ * function has no doca_dpa handle of its own and cannot reach DPA memory,
+ * so it must not (and, as originally written, incorrectly did) rebuild the
+ * rule table itself only to discard it — `num_rules` is the one piece of
+ * that table this function actually needs, so the caller passes it directly.
+ *
  * This single-request-per-launch shape is a starting point for correctness
  * validation, not the throughput-oriented design — see the experiment
  * README for how this composes with an RDMA-triggered, batched invocation
@@ -92,34 +107,20 @@ doca_error_t routenic_fastpath_launch(struct dpa_resources *resources,
 				       uint64_t request_text_dpa_addr,
 				       uint32_t request_len,
 				       uint64_t rules_dpa_addr,
+				       uint32_t num_rules,
 				       uint64_t out_matched_dpa_addr)
 {
-	struct fastpath_keyword_rule rules[FASTPATH_MAX_RULES];
-	uint32_t num_rules = 0;
-	struct doca_sync_event *wait_event = NULL;
 	struct doca_sync_event *comp_event = NULL;
 	doca_error_t result, tmp_result;
 
-	result = routenic_build_rule_table(rules, &num_rules);
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to build fast-path rule table: %s", doca_error_get_descr(result));
-		return result;
-	}
-
-	/* Caller is responsible for having already RDMA-written / DMA-copied
-	 * `rules` to rules_dpa_addr in DPA-accessible memory before this
-	 * call — that memory-placement step is deliberately factored out of
-	 * this launcher so it can be swapped between "host writes it once at
-	 * startup" (this experiment) and "BF3 rewrites it on config reload"
-	 * (a natural extension) without touching the launch call below. */
-
-	result = create_doca_dpa_wait_sync_event(resources->pf_dpa_ctx, resources->pf_doca_device, &wait_event);
-	if (result != DOCA_SUCCESS)
-		return result;
-
+	/* No wait_event: this launch runs immediately (NULL wait condition
+	 * below), so there is nothing to wait on before starting — creating
+	 * one anyway (as the dpa_kernel_launch sample does, because *that*
+	 * sample uses its wait_event from a separate thread) would just be an
+	 * unused DOCA resource to create and destroy on every call. */
 	result = create_doca_dpa_completion_sync_event(resources->pf_dpa_ctx, resources->pf_doca_device, &comp_event, NULL);
 	if (result != DOCA_SUCCESS)
-		goto destroy_wait_event;
+		return result;
 
 	result = doca_dpa_kernel_launch_update_set(resources->pf_dpa_ctx,
 						    NULL, /* no wait condition: run immediately */
@@ -144,10 +145,6 @@ doca_error_t routenic_fastpath_launch(struct dpa_resources *resources,
 
 destroy_comp_event:
 	tmp_result = doca_sync_event_destroy(comp_event);
-	if (tmp_result != DOCA_SUCCESS)
-		DOCA_ERROR_PROPAGATE(result, tmp_result);
-destroy_wait_event:
-	tmp_result = doca_sync_event_destroy(wait_event);
 	if (tmp_result != DOCA_SUCCESS)
 		DOCA_ERROR_PROPAGATE(result, tmp_result);
 	return result;

@@ -1,0 +1,15 @@
+[2026-08-12 18:21:56:486670][759939104][DOCA][INF][CORE][doca_log.cpp:900] DOCA version 3.3.0109
+EAL: Detected CPU lcores: 20
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+[2026-08-12 18:21:56:779317][759939104][DOCA][WRN][FLOW][engine_model.c:88] adapting queue depth to 128.
+[2026-08-12 18:21:56:968357][759939104][DOCA][ERR][FLOW][engine_pipe.c:1115] basic pipe entry destroy failed
+[2026-08-12 18:21:56:968405][759939104][DOCA][ERR][FLOW][engine_pipe.c:1115] basic pipe entry destroy failed
+[2026-08-12 18:21:58:211914][759939104][DOCA][WRN][DPDK_BRIDGE][doca_dpdk.cpp:562] DPDK dev already detached: 0
+routeNIC Experiment 3: real ASAP2 tenant steering pipe test (3 tenant routes)
+  pipe created: 0xb07a0da3ce80
+  entries processed=4 failure=false
+routeNIC Experiment 3: PASS (real hardware, doca_flow_pipe_control_add_entry + doca_flow_entries_process against a live ConnectX-7 port)
+[2026-08-12 18:21:58:213893][759939104][DOCA][INF][ROUTENIC_ASAP2_TEST_MAIN][asap2_test_main.c:84][main] routeNIC Experiment 3 test finished successfully

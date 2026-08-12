@@ -19,8 +19,19 @@ DOCA_APP_ATTRIBUTES2BLOB="${DOCA_DIR}/tools/dpa-app-attributes2blob"
 # source can be validated (compile-only — ConnectX-7 has no DPA to actually
 # run it on) against the other NIC in this lab, per the project's "no fixed
 # NIC" instruction for anything that isn't inherently BF3-only.
+# --app-name must be exactly "dpa_sample_app": dpa_common.c (the shared DPA
+# bootstrap every sample in this DOCA install links against, reused as-is by
+# host/fastpath_launcher.c/fastpath_main.c rather than re-derived) hardcodes
+# `extern struct doca_dpa_app *dpa_sample_app;` and passes that literal
+# symbol to doca_dpa_set_app() — confirmed by reading dpa_common.c and every
+# sample's build_dpacc_samples.sh, which all pass this same fixed name.
+# Originally built here as "routenic_fastpath_app", which compiled fine via
+# dpacc (dpacc doesn't care about downstream host-side linkage) but would
+# have failed to link the first time fastpath_main.c actually called
+# allocate_dpa_resources() — caught by reading the real source, not by
+# compiling alone.
 MCPU_TARGETS="nv-dpa-bf3,nv-dpa-cx7"
-APP_NAME="routenic_fastpath_app"
+APP_NAME="dpa_sample_app"
 
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"

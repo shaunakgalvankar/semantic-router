@@ -1,0 +1,2 @@
+option('doca_prefix', type: 'string', value: '/opt/mellanox/doca',
+       description: 'DOCA SDK install prefix (its samples/ and applications/ subdirs are reused directly)')
