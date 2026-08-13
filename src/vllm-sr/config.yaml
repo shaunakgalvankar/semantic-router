@@ -1,0 +1,469 @@
+version: v0.3
+listeners:
+    - name: http-8899
+      address: 0.0.0.0
+      port: 8899
+      timeout: 300s
+providers:
+    defaults:
+        default_model: demo-model
+    models:
+        - name: demo-model
+          provider_model_id: qwen3.6:latest
+          backend_refs:
+            - name: demo-model_qwen3.6_primary
+              endpoint: 172.18.0.1:11434
+              protocol: http
+              weight: 100
+              type: ollama
+          external_model_ids:
+            ollama: qwen3.6:latest
+        - name: reasoning-specialist
+          provider_model_id: qwen3.6:latest
+          backend_refs:
+            - name: reasoning-specialist_qwen3.6_primary
+              endpoint: 172.18.0.1:11434
+              protocol: http
+              weight: 100
+              type: ollama
+          external_model_ids:
+            ollama: qwen3.6:latest
+        - name: safety-review-model
+          provider_model_id: qwen3.6:latest
+          backend_refs:
+            - name: safety-review-model_qwen3.6_primary
+              endpoint: 172.18.0.1:11434
+              protocol: http
+              weight: 100
+              type: ollama
+          external_model_ids:
+            ollama: qwen3.6:latest
+        - name: history-specialist
+          provider_model_id: qwen3.6:latest
+          backend_refs:
+            - name: primary
+              endpoint: 172.18.0.1:11434
+              protocol: http
+              weight: 100
+              type: ollama
+          external_model_ids:
+            ollama: qwen3.6:latest
+routing:
+    modelCards:
+        - name: demo-model
+          modality: text
+        - name: reasoning-specialist
+          modality: text
+        - name: safety-review-model
+          modality: text
+        - name: history-specialist
+          modality: text
+    signals:
+        keywords:
+            - name: jailbreak_words
+              operator: OR
+              keywords:
+                - ignore previous instructions
+                - ignore all previous instructions
+                - pretend you have no restrictions
+                - bypass your safety rules
+                - jailbreak
+              case_sensitive: false
+            - name: sensitive_data_words
+              operator: OR
+              keywords:
+                - social security number
+                - credit card number
+                - my password is
+                - api key is
+              case_sensitive: false
+            - name: reasoning_words
+              operator: OR
+              keywords:
+                - step by step
+                - prove that
+                - derive
+                - solve this equation
+                - explain in detail why
+              case_sensitive: false
+        domains:
+            - name: economics signal
+              description: this is an economics signal
+              mmlu_categories:
+                - economics
+            - name: history domain signal
+              description: This is the history domain signal
+              mmlu_categories:
+                - history
+    decisions:
+        - name: jailbreak-flagged
+          description: 'Demo: route suspected jailbreak/prompt-injection attempts to a review-flagged model.'
+          priority: 300
+          rules:
+            operator: OR
+            conditions:
+                - type: keyword
+                  name: jailbreak_words
+          modelRefs:
+            - model: safety-review-model
+              use_reasoning: false
+        - name: sensitive-data-flagged
+          description: 'Demo: route prompts naming sensitive data types to a review-flagged model.'
+          priority: 290
+          rules:
+            operator: OR
+            conditions:
+                - type: keyword
+                  name: sensitive_data_words
+          modelRefs:
+            - model: safety-review-model
+              use_reasoning: false
+        - name: reasoning-heavy
+          description: 'Demo: route multi-step reasoning prompts to the reasoning-specialist model.'
+          priority: 280
+          rules:
+            operator: OR
+            conditions:
+                - type: keyword
+                  name: reasoning_words
+          modelRefs:
+            - model: reasoning-specialist
+              use_reasoning: true
+        - name: default-route
+          description: Generated during setup to route all requests to the default model.
+          priority: 100
+          rules:
+            operator: AND
+          modelRefs:
+            - model: demo-model
+              use_reasoning: false
+        - name: economics
+          description: routes to an economics fine tuned model
+          priority: 270
+          rules:
+            operator: AND
+            conditions:
+                - type: domain
+                  name: economics signal
+          modelRefs:
+            - model: reasoning-specialist
+              use_reasoning: false
+        - name: history
+          description: routes to a history fine tuned model
+          priority: 260
+          rules:
+            operator: AND
+            conditions:
+                - type: domain
+                  name: history domain signal
+          modelRefs:
+            - model: history-specialist
+              use_reasoning: false
+global:
+    router:
+        config_source: file
+        auto_model_name: MoM
+        include_config_models_in_list: false
+        clear_route_cache: true
+        streamed_body:
+            enabled: false
+        skip_processing:
+            enabled: false
+        model_selection:
+            method: knn
+            enabled: true
+            router_dc:
+                temperature: 0.07
+                dimension_size: 768
+                min_similarity: 0.3
+                use_query_contrastive: true
+                use_model_contrastive: true
+                require_descriptions: false
+                use_capabilities: true
+            hybrid:
+                experience_weight: 0.3
+                router_dc_weight: 0.3
+                automix_weight: 0.2
+                cost_weight: 0.2
+                quality_gap_threshold: 0.1
+                normalize_scores: true
+    services:
+        api:
+            batch_classification: {}
+        response_api:
+            enabled: true
+            store_backend: redis
+            ttl_seconds: 86400
+            max_responses: 1000
+        observability:
+            tracing:
+                enabled: true
+                provider: opentelemetry
+                exporter:
+                    type: otlp
+                    endpoint: vllm-sr-jaeger:4317
+                    insecure: true
+                sampling:
+                    type: always_on
+                    rate: 1
+                resource:
+                    service_name: vllm-sr
+                    service_version: v0.3.0
+                    deployment_environment: development
+            metrics:
+                enabled: true
+                windowed_metrics:
+                    enabled: false
+                    model_metrics: false
+                    queue_depth_estimation: false
+        authz: {}
+        ratelimit: {}
+        management_api:
+            bind_address: 127.0.0.1
+            port: 8080
+            auth:
+                mode: disabled
+                roles:
+                    admin:
+                        - '*'
+                    operator:
+                        - health.read
+                        - ready.read
+                        - docs.read
+                        - metrics.read
+                        - classify.invoke
+                        - config.read
+                        - config.write
+                        - learning.ingest
+                        - data.read
+                        - data.write
+                    viewer:
+                        - health.read
+                        - ready.read
+                        - docs.read
+                        - metrics.read
+                        - classify.invoke
+                        - config.read
+                        - data.read
+        router_replay:
+            enabled: true
+            store_backend: postgres
+            ttl_seconds: 2592000
+        startup_status:
+            store_backend: file
+    stores:
+        semantic_cache:
+            backend_type: memory
+            enabled: true
+            max_entries: 1000
+            ttl_seconds: 3600
+            eviction_policy: fifo
+        memory:
+            milvus:
+                address: ""
+                collection: agentic_memory
+                dimension: 384
+            extraction_batch_size: 10
+            default_retrieval_limit: 5
+            default_similarity_threshold: 0.7
+    integrations:
+        tools:
+            enabled: false
+            top_k: 3
+            tools_db_path: config/tools_db.json
+            fallback_to_empty: true
+        looper:
+            endpoint: http://localhost:8899/v1/chat/completions
+            timeout_seconds: 1200
+            flow:
+                state:
+                    store_backend: file
+                    ttl_seconds: 1800
+    model_catalog:
+        embeddings:
+            semantic:
+                qwen3_model_path: ""
+                gemma_model_path: ""
+                mmbert_model_path: models/mmbert-embed-32k-2d-matryoshka
+                bert_model_path: ""
+                use_cpu: true
+                embedding_config:
+                    model_type: mmbert
+                    preload_embeddings: true
+                    target_dimension: 768
+                    target_layer: 22
+                    enable_soft_matching: true
+                    top_k: 1
+                    min_score_threshold: 0.5
+        system:
+            prompt_guard: models/mmbert32k-jailbreak-detector-merged
+            domain_classifier: models/mmbert32k-intent-classifier-merged
+            pii_classifier: models/mmbert32k-pii-detector-merged
+            fact_check_classifier: models/mmbert32k-factcheck-classifier-merged
+            hallucination_detector: models/mom-halugate-detector
+            hallucination_explainer: models/mom-halugate-explainer
+            feedback_detector: models/mmbert32k-feedback-detector-merged
+        kbs:
+            - name: privacy_kb
+              source:
+                path: knowledge_bases/privacy/
+                manifest: labels.json
+              threshold: 0.55
+              label_thresholds:
+                prompt_injection: 0.7
+              groups:
+                frontier_reasoning:
+                    - architecture_analysis
+                    - root_cause_analysis
+                    - multi_step_tradeoffs
+                local_standard:
+                    - generic_coding
+                    - simple_task
+                    - general_knowledge
+                privacy_policy:
+                    - proprietary_code
+                    - internal_document
+                    - pii
+                    - business_strategy
+                    - trade_secret_ip
+                    - operational_infrastructure
+                    - locality_directive
+                    - customer_data
+                private:
+                    - prompt_injection
+                    - credential_exfiltration
+                    - jailbreak_role
+                    - system_prompt_extraction
+                    - proprietary_code
+                    - internal_document
+                    - pii
+                    - business_strategy
+                    - trade_secret_ip
+                    - operational_infrastructure
+                    - locality_directive
+                    - customer_data
+                public:
+                    - architecture_analysis
+                    - root_cause_analysis
+                    - multi_step_tradeoffs
+                    - generic_coding
+                    - simple_task
+                    - general_knowledge
+                security_containment:
+                    - prompt_injection
+                    - credential_exfiltration
+                    - jailbreak_role
+                    - system_prompt_extraction
+              metrics:
+                - name: private_vs_public
+                  type: group_margin
+                  positive_group: private
+                  negative_group: public
+            - name: mmlu_kb
+              source:
+                path: knowledge_bases/mmlu/
+                manifest: labels.json
+              threshold: 0.25
+              groups:
+                escalate:
+                    - biology
+                    - business
+                    - computer science
+                    - economics
+                    - history
+                    - math
+                    - other
+                    - philosophy
+                    - psychology
+                keep:
+                    - chemistry
+                    - engineering
+                    - health
+                    - law
+                    - physics
+              metrics:
+                - name: escalate_vs_keep
+                  type: group_margin
+                  positive_group: escalate
+                  negative_group: keep
+        modules:
+            prompt_compression:
+                enabled: false
+                max_tokens: 0
+            prompt_guard:
+                enabled: true
+                model_id: models/mmbert32k-jailbreak-detector-merged
+                threshold: 0.7
+                use_cpu: true
+                use_modernbert: false
+                use_mmbert_32k: true
+                jailbreak_mapping_path: models/mmbert32k-jailbreak-detector-merged/jailbreak_type_mapping.json
+                model_ref: prompt_guard
+            classifier:
+                domain:
+                    model_id: models/mmbert32k-intent-classifier-merged
+                    threshold: 0.5
+                    use_cpu: true
+                    use_modernbert: false
+                    use_mmbert_32k: true
+                    category_mapping_path: models/mmbert32k-intent-classifier-merged/category_mapping.json
+                    model_ref: domain_classifier
+                mcp:
+                    enabled: false
+                    transport_type: ""
+                    threshold: 0
+                pii:
+                    model_id: models/mmbert32k-pii-detector-merged
+                    threshold: 0.9
+                    use_cpu: true
+                    use_mmbert_32k: true
+                    pii_mapping_path: models/mmbert32k-pii-detector-merged/pii_type_mapping.json
+                    model_ref: pii_classifier
+                preference:
+                    use_contrastive: true
+                    prototype_scoring:
+                        enabled: true
+                        cluster_similarity_threshold: 0.9
+                        max_prototypes: 8
+                        best_weight: 0.75
+                        top_m: 2
+            complexity:
+                prototype_scoring:
+                    enabled: true
+                    cluster_similarity_threshold: 0.9
+                    max_prototypes: 8
+                    best_weight: 0.75
+                    top_m: 2
+            hallucination_mitigation:
+                fact_check:
+                    model_id: models/mmbert32k-factcheck-classifier-merged
+                    threshold: 0.6
+                    use_cpu: true
+                    use_mmbert_32k: true
+                    model_ref: fact_check_classifier
+                detector:
+                    model_id: models/mom-halugate-detector
+                    threshold: 0.8
+                    use_cpu: true
+                    min_span_length: 2
+                    min_span_confidence: 0.6
+                    context_window_size: 50
+                    enable_nli_filtering: true
+                    nli_entailment_threshold: 0.75
+                    model_ref: hallucination_detector
+                explainer:
+                    model_id: models/mom-halugate-explainer
+                    threshold: 0.9
+                    use_cpu: true
+                    model_ref: hallucination_explainer
+            feedback_detector:
+                enabled: true
+                model_id: models/mmbert32k-feedback-detector-merged
+                threshold: 0.7
+                use_cpu: true
+                use_modernbert: false
+                use_mmbert_32k: true
+                feedback_mapping_path: ""
+                model_ref: feedback_detector
+            modality_detector:
+                enabled: false
